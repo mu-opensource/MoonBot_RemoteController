@@ -15,7 +15,6 @@ void setup() {
   LED.begin();
   LED.clear();
   LED.show();
-  TankBase.rpmCorrection(114);
   TankBase.distanceCorrection(112);
   TankBase.wheelSpacingSet(146);
 }
