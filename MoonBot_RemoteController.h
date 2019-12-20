@@ -35,7 +35,6 @@
   do {\
     error_ = err;\
     if (error_ == MU_OK) {\
-      while(uart_->available()) {uart_->read();}\
       response(cmd_, sub_cmd_);\
       return;\
     }\
@@ -56,7 +55,7 @@
 
 class MoonBotRemoteController : public MoonBotRemoteProtocolAnalysis {
  public:
-  MoonBotRemoteController(MuVsUart* uart,
+  MoonBotRemoteController(MuUart::hw_port_t uart,
                          uint32_t address,
                          bool response_enable = true);
   virtual ~MoonBotRemoteController(void);
@@ -77,11 +76,7 @@ class MoonBotRemoteController : public MoonBotRemoteProtocolAnalysis {
   inline uint8_t portCFG(void);
   inline uint8_t controllerFormCheck(void);
   inline uint8_t controllerReadForm(void);
-  uint8_t controllerExit(void) {
-    exit_ = true;
-    resetParameterIndex();
-    return MU_OK;
-  }
+  inline uint8_t controllerExit(void);
   // LED
   inline uint8_t ledWrite(void);
   inline uint8_t ledSetColor(void);
@@ -145,15 +140,23 @@ class MoonBotRemoteController : public MoonBotRemoteProtocolAnalysis {
   inline uint8_t appButtonDrag(void);
 
   void enableAllServoPower(bool state);
+  void enableTankBaseStopEvent(unsigned long time2stop = 15000) {
+    tank_base_stop_event_enable_ = true;
+    time2stop_tank_base_ = millis()+time2stop;
+  }
+
+  void clearBuffer();
 
   SoftwareSerial* sw_serial_ = NULL;
   enum moonbot_remot_common_event_t {
     kMoonBotRemoteCommonEventNone,
     kMoonBotRemoteCommonEventNum,
   };
+  unsigned long time2stop_tank_base_ = 0;
+  bool tank_base_stop_event_enable_ = false;
   uint8_t remote_event_ = kMoonBotRemoteCommonEventNone;
   uint8_t form_ = MOONBOT_REMOT_FORM_COMMON;
-  uint8_t error_ = MU_ERROR_COMMAND;
+  uint8_t error_ = MU_SLAVE_UNKNOW_COMMAND;
   uint8_t eyes_color_[2][3] = { { 0 }, { 0 } };
   bool motor_encoder_enable_[kMotorNum] = {false};
   static const uint8_t color_map_[][3];

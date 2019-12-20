@@ -7,9 +7,9 @@
 
 #include "MoonBot_RoverRemoteController.h"
 
-MoonBotRoverRemoteController::MoonBotRoverRemoteController(MuVsUart* uart,
-                                                       uint32_t address,
-                                                       bool response_enable)
+MoonBotRoverRemoteController::MoonBotRoverRemoteController(MuUart::hw_port_t uart,
+                                                           uint32_t address,
+                                                           bool response_enable)
     : MoonBotRemoteController(uart, address, response_enable),
       rover_(Mu) {
   form_ = MOONBOT_REMOT_FORM_ROVER;
@@ -43,17 +43,19 @@ void MoonBotRoverRemoteController::CommandMatcher(void) {
 void MoonBotRoverRemoteController::RunEvent(void) {
   switch (remote_event_) {
     case kMoonBotRemoteRoverEventFollowBall: {
-      static unsigned long ball_count = 0;
-      if (ball_count++%500 == 0) {
+      // FIXME delete this code
+//      static unsigned long ball_count = 0;
+//      if (ball_count++%500 == 0) {
         rover_.runFollowBall();
-      }
+//      }
     }
       break;
     case kMoonBotRemoteRoverEventCardDetect:
-      static unsigned long count = 0;
-      if (count++%500 == 0) {
+      // FIXME delete this code
+//      static unsigned long count = 0;
+//      if (count++%500 == 0) {
         rover_.runTrafficNumber();
-      }
+//      }
       break;
     default:
       break;
@@ -104,7 +106,7 @@ uint8_t MoonBotRoverRemoteController::roverAppButtonClick(void) {
           rover_.followBallEnd();
           break;
         default:
-          return MU_ERROR_REG_VALUE;
+          return MU_SLAVE_UNKNOW_REG_VALUE;
       }
       resetParameterIndex();
       return MU_OK;
@@ -216,7 +218,7 @@ uint8_t MoonBotRoverRemoteController::roverAppButtonClick(void) {
     default:
       break;
   }
-  return MU_ERROR_REG_VALUE;
+  return MU_SLAVE_UNKNOW_REG_VALUE;
 }
 
 //uint8_t MoonBotRoverRemoteController::buzzerPlay(uint8_t num) {

@@ -9,27 +9,9 @@
 #define MOONBOT_MOONBOT_REMOTCONTROLLER_MOONBOT_REMOTTYPES_H_
 
 #include <stdio.h>
+#include <DebugTool/morpx_debug_tool.h>
 
-#define MR_DEBUG                        0
-#if MR_DEBUG != 0
-#define IPRINTF(s,...)                  printf("\e[0;32mI:" s "\e[0m", ##__VA_ARGS__)
-#define WPRINTF(s,...)                  printf("\e[0;33min file:%s, function:%s, line: %d\nW:" s "\e[0m",\
-                                                __FILE__, \
-                                                __PRETTY_FUNCTION__,\
-                                                __LINE__, \
-                                                ##__VA_ARGS__)
-#define EPRINTF(s,...)                  printf("\e[0;31min file:%s, function:%s, line: %d\nE:" s "\e[0m",\
-                                                __FILE__,\
-                                                __PRETTY_FUNCTION__,\
-                                                __LINE__,\
-                                                ##__VA_ARGS__)
-#else
-// XXX sometimes raises "unused variable" warning
-#define IPRINTF(s,...)
-#define WPRINTF(s,...)
-#define EPRINTF(s,...)
-#endif
-
+#define MOONBOT_REMOT_DEFAULT_ADDRESS   (MU_VISION_SENSOR_DEFAULT_ADDRESS+0x0A)
 #define MOONBOT_REMOT_VERSION           0x01
 #define MOONBOT_REMOT_PRODUCT_ID        0x03
 #define MOONBOT_REMOT_FORM_COMMON       0x00

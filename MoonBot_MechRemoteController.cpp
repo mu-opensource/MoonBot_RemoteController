@@ -7,7 +7,7 @@
 
 #include <MoonBot_MechRemoteController.h>
 
-MoonBotMechRemoteController::MoonBotMechRemoteController(MuVsUart* uart,
+MoonBotMechRemoteController::MoonBotMechRemoteController(MuUart::hw_port_t uart,
                                                          uint32_t address,
                                                          bool response_enable)
     : MoonBotRemoteController(uart, address, response_enable),
@@ -44,11 +44,6 @@ void MoonBotMechRemoteController::CommandMatcher(void) {
 void MoonBotMechRemoteController::RunEvent(void) {
   switch (remote_event_) {
     case kMoonBotRemoteMechEventSearchGrabBall:
-      static uint32_t ball_count = 0;
-      ball_count++;
-      if (ball_count%500) {
-        break;
-      }
       switch (mech_basketball_state_) {
         case kSearchBall:
           if (mech_.searchBall()) {
@@ -73,11 +68,6 @@ void MoonBotMechRemoteController::RunEvent(void) {
       };
       break;
     case kMoonBotRemoteMechEventSearchShootBall:
-      static uint32_t ball_shoot_count = 0;
-      ball_shoot_count++;
-      if (ball_shoot_count%500) {
-        break;
-      }
       switch (mech_basketball_state_) {
         case kSearchCard:
           if(mech_.searchCard()) {
@@ -102,9 +92,9 @@ void MoonBotMechRemoteController::RunEvent(void) {
       }
       break;
     default:
-      MoonBotRemoteController::RunEvent();
       break;
   }
+  MoonBotRemoteController::RunEvent();
 }
 
 uint8_t MoonBotMechRemoteController::mechAppButtonClick(void) {
@@ -224,7 +214,7 @@ uint8_t MoonBotMechRemoteController::mechAppButtonClick(void) {
     default:
       break;
   }
-  return MU_ERROR_REG_VALUE;
+  return MU_SLAVE_UNKNOW_REG_VALUE;
 }
 
 uint8_t MoonBotMechRemoteController::dance(uint8_t num) {
@@ -233,7 +223,7 @@ uint8_t MoonBotMechRemoteController::dance(uint8_t num) {
     case 0x00:
       break;
     default:
-      return MU_ERROR_REG_VALUE;
+      return MU_SLAVE_UNKNOW_REG_VALUE;
   }
   return MU_OK;
 }

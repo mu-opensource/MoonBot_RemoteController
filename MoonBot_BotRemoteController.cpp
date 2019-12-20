@@ -7,7 +7,7 @@
 
 #include "MoonBot_BotRemoteController.h"
 
-MoonBotBotRemoteController::MoonBotBotRemoteController(MuVsUart* uart,
+MoonBotBotRemoteController::MoonBotBotRemoteController(MuUart::hw_port_t uart,
                                                        uint32_t address,
                                                        bool response_enable)
     : MoonBotRemoteController(uart, address, response_enable),
@@ -54,9 +54,9 @@ void MoonBotBotRemoteController::CommandMatcher(void) {
 void MoonBotBotRemoteController::RunEvent(void) {
   switch (remote_event_) {
     default:
-      MoonBotRemoteController::RunEvent();
       break;
   }
+  MoonBotRemoteController::RunEvent();
 }
 
 uint8_t MoonBotBotRemoteController::botAppButtonClick(void) {
@@ -144,7 +144,7 @@ uint8_t MoonBotBotRemoteController::botAppButtonClick(void) {
       break;
   }
 
-  return MU_ERROR_REG_VALUE;
+  return MU_SLAVE_UNKNOW_REG_VALUE;
 }
 
 uint8_t MoonBotBotRemoteController::dance(uint8_t num) {
@@ -181,7 +181,7 @@ uint8_t MoonBotBotRemoteController::dance(uint8_t num) {
     }
       break;
     default:
-      return MU_ERROR_REG_VALUE;
+      return MU_SLAVE_UNKNOW_REG_VALUE;
   }
   resetParameterIndex();
   return MU_OK;

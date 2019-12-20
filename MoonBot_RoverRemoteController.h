@@ -13,7 +13,7 @@
 
 class MoonBotRoverRemoteController : public MoonBotRemoteController {
  public:
-  MoonBotRoverRemoteController(MuVsUart* uart,
+  MoonBotRoverRemoteController(MuUart::hw_port_t uart,
                                uint32_t address,
                                bool response_enable = false);
   virtual ~MoonBotRoverRemoteController(void);

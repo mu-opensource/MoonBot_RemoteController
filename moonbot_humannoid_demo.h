@@ -33,7 +33,7 @@ class MoonBot_HumannoidDemo {
   int r_angle_ = 90;
   int l_angle_ = 90;
   int head_angle_ = 90;
-  MuVisionSensorUart mu_uart_;      // TODO temporary function
+  MuVsUartMethod mu_uart_;      // TODO temporary function
 };
 
 #endif /* MOONBOT_REMOTECONTROLLER_MOONBOT_HUMANNOID_DEMO_H_ */

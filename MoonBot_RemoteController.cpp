@@ -43,7 +43,7 @@ const uint8_t MoonBotRemoteController::beat_map_[] = {
     BEAT_FRACTION_EIGHTH,
     BEAT_FRACTION_SIXTEENTH,};
 
-MoonBotRemoteController::MoonBotRemoteController(MuVsUart* uart,
+MoonBotRemoteController::MoonBotRemoteController(MuUart::hw_port_t uart,
                                                  uint32_t address,
                                                  bool response_enable)
     : MoonBotRemoteProtocolAnalysis(uart,address,response_enable) {
@@ -58,8 +58,8 @@ MoonBotRemoteController::MoonBotRemoteController(MuVsUart* uart,
   digitalWrite(MOONBOT_PIN_BUZZER_SHDW, LOW);
   for (int i = 0; i < kServoNum; ++i) {
     m_servo[i].attach((moonbot_servo_t)i);
-    // TODO for default setting
-//    m_servo[i].power(false);
+    m_servo[i].write(90);
+    m_servo[i].power(false);
   }
 
   // TODO default setting
@@ -74,12 +74,16 @@ MoonBotRemoteController::MoonBotRemoteController(MuVsUart* uart,
   TankBase.begin();
 }
 
-MoonBotRemoteController::~MoonBotRemoteController(void) {}
+MoonBotRemoteController::~MoonBotRemoteController(void) {
+  for (int i = 0; i < kServoNum; ++i) {
+    m_servo[i].detach();
+  }
+}
 
 void MoonBotRemoteController::run(void) {
   if (capture() == MU_OK) {
-    remote_event_ = kMoonBotRemoteCommonEventNone;     // new command coming, clean event.
-    error_ = MU_ERROR_COMMAND;                       // reset error to error command
+    remote_event_ = kMoonBotRemoteCommonEventNone;      // new command coming, clean event.
+    error_ = MU_SLAVE_UNKNOW_COMMAND;                   // reset error to error command
     CommandMatcher();
   }
   RunEvent();
@@ -189,12 +193,25 @@ void MoonBotRemoteController::CommandMatcher(void) {
           cmd_, sub_cmd_);
   responseError(error_);
 }
-void MoonBotRemoteController::RunEvent(void) {}
+void MoonBotRemoteController::RunEvent(void) {
+  if (tank_base_stop_event_enable_ && millis() >= time2stop_tank_base_) {
+    tank_base_stop_event_enable_ = false;
+    TankBase.write(0, 0);
+  }
+}
+
 void MoonBotRemoteController::enableAllServoPower(bool state) {
   for (int i = 0; i < kServoNum; ++i) {
     m_servo[i].power(state);
   }
 }
+
+void MoonBotRemoteController::clearBuffer() {
+  while (MoonBotRemoteProtocolAnalysis::available()) {
+    MoonBotRemoteProtocolAnalysis::receive();
+  }
+}
+
 // device functions
 static bool swSerialInit(SoftwareSerial* sw_serial,
                                uint8_t rx, uint8_t tx) {
@@ -397,6 +414,11 @@ uint8_t MoonBotRemoteController::controllerReadForm(void) {
   setParameter<uint8_t>(MOONBOT_REMOT_VERSION);
   return MU_OK;
 }
+uint8_t MoonBotRemoteController::controllerExit(void) {
+  exit_ = true;
+  resetParameterIndex();
+  return MU_OK;
+}
 // LED
 // test CMD:  FF0C60710101008080805EED    // set on board led to rgb(0x80, 0x80, 0x80)
 //            FF0C6071010100000000DEED    // close on board led
@@ -419,7 +441,7 @@ uint8_t MoonBotRemoteController::ledWrite(void) {
     default:
       EPRINTF("Not available id:%d\n", id_);
       resetParameterIndex();
-      return MU_ERROR_REG_VALUE;
+      return MU_SLAVE_UNKNOW_REG_VALUE;
   }
   if (led_id == 0) {
     led_id = led->numPixels();
@@ -455,7 +477,7 @@ uint8_t MoonBotRemoteController::ledSetColor(void) {
     default:
       EPRINTF("Not available id:%d\n", id_);
       resetParameterIndex();
-      return MU_ERROR_REG_VALUE;
+      return MU_SLAVE_UNKNOW_REG_VALUE;
   }
   if (led_id) {
     led->setPixelColor(led_id-1, r, g, b);
@@ -478,7 +500,7 @@ uint8_t MoonBotRemoteController::ledShow(void) {
     default:
       EPRINTF("Not available id:%d\n", id_);
       resetParameterIndex();
-      return MU_ERROR_REG_VALUE;
+      return MU_SLAVE_UNKNOW_REG_VALUE;
   }
   enableAllServoPower(false);
   led->show();
@@ -501,7 +523,7 @@ uint8_t MoonBotRemoteController::ledClear(void) {
     default:
       EPRINTF("Not available id:%d\n", id_);
       resetParameterIndex();
-      return MU_ERROR_REG_VALUE;
+      return MU_SLAVE_UNKNOW_REG_VALUE;
   }
   led->clear();
 
@@ -520,7 +542,7 @@ uint8_t MoonBotRemoteController::ledMatrix(void) {
       break;
     default:
       EPRINTF("Not available id:%d\n", id_);
-      return MU_ERROR_REG_VALUE;
+      return MU_SLAVE_UNKNOW_REG_VALUE;
   }
   uint8_t led_n = getParameter<uint8_t>();
   for (uint8_t i = 0; i < led_n; ++i) {
@@ -561,7 +583,7 @@ uint8_t MoonBotRemoteController::ledSimpleWrite(void) {
       break;
     default:
       EPRINTF("Not available id:%d\n", id_);
-      return MU_ERROR_REG_VALUE;
+      return MU_SLAVE_UNKNOW_REG_VALUE;
   }
   size_t color_map_len = sizeof(color_map_)/3;
   if (color > color_map_len) {
@@ -844,9 +866,10 @@ uint8_t MoonBotRemoteController::ledAction(uint8_t num) {
     default:
       enableAllServoPower(true);
       resetParameterIndex();
-      return MU_ERROR_REG_VALUE;
+      return MU_SLAVE_UNKNOW_REG_VALUE;
   }
   enableAllServoPower(true);
+  clearBuffer();
   resetParameterIndex();
   return MU_OK;
 }
@@ -889,7 +912,7 @@ uint8_t MoonBotRemoteController::servoWrite(void) {
       break;
     default:
       resetParameterIndex();
-      return MU_ERROR_REG_VALUE;
+      return MU_SLAVE_UNKNOW_REG_VALUE;
   }
   m_servo[id_-1].write(angle);
 
@@ -925,7 +948,7 @@ uint8_t MoonBotRemoteController::servoSetTargetAngle(void) {
       break;
     default:
       resetParameterIndex();
-      return MU_ERROR_REG_VALUE;
+      return MU_SLAVE_UNKNOW_REG_VALUE;
   }
   m_servo[id_-1].setTargetAngle(angle ,speed);
 
@@ -977,7 +1000,7 @@ uint8_t MoonBotRemoteController::motorWriteRpm(void) {
       break;
     default:
       resetParameterIndex();
-      return MU_ERROR_REG_VALUE;
+      return MU_SLAVE_UNKNOW_REG_VALUE;
   }
 
   resetParameterIndex();
@@ -994,7 +1017,7 @@ uint8_t MoonBotRemoteController::motorReadRpm(void) {
       break;
     default:
       resetParameterIndex();
-      return MU_ERROR_REG_VALUE;
+      return MU_SLAVE_UNKNOW_REG_VALUE;
   }
 
   resetParameterIndex();
@@ -1016,7 +1039,7 @@ uint8_t MoonBotRemoteController::motorWrite(void) {
       motor = &Motor2;
       break;
     default:
-      return MU_ERROR_REG_VALUE;
+      return MU_SLAVE_UNKNOW_REG_VALUE;
   }
   vol_now = motor->read();
   switch (mode) {
@@ -1035,7 +1058,7 @@ uint8_t MoonBotRemoteController::motorWrite(void) {
       vol = -vol;
       break;
     default:
-      return MU_ERROR_REG_VALUE;
+      return MU_SLAVE_UNKNOW_REG_VALUE;
   }
   motor->write(vol);
 
@@ -1052,7 +1075,7 @@ uint8_t MoonBotRemoteController::motorRead(void) {
       vol = Motor1.read();
       break;
     default:
-      return MU_ERROR_REG_VALUE;
+      return MU_SLAVE_UNKNOW_REG_VALUE;
   }
 
   resetParameterIndex();
@@ -1070,7 +1093,7 @@ uint8_t MoonBotRemoteController::wheelCalibrate(void) {
     default:
       EPRINTF("Not available id:%d\n", id_);
       resetParameterIndex();
-      return MU_ERROR_REG_VALUE;
+      return MU_SLAVE_UNKNOW_REG_VALUE;
   }
   resetParameterIndex();
   return MU_OK;
@@ -1099,7 +1122,7 @@ uint8_t MoonBotRemoteController::wheelWriteRpm(void) {
       left_rpm = -left_rpm;
       break;
     default:
-      return MU_ERROR_REG_VALUE;
+      return MU_SLAVE_UNKNOW_REG_VALUE;
   }
   int right_rpm_now = TankBase.readRpm(kLeftMotor);
   switch (right_mode) {
@@ -1118,7 +1141,7 @@ uint8_t MoonBotRemoteController::wheelWriteRpm(void) {
       right_rpm = -right_rpm;
       break;
     default:
-      return MU_ERROR_REG_VALUE;
+      return MU_SLAVE_UNKNOW_REG_VALUE;
   }
   switch (id_) {
     case 1:
@@ -1126,7 +1149,7 @@ uint8_t MoonBotRemoteController::wheelWriteRpm(void) {
       break;
     default:
       resetParameterIndex();
-      return MU_ERROR_REG_VALUE;
+      return MU_SLAVE_UNKNOW_REG_VALUE;
   }
   resetParameterIndex();
   return MU_OK;
@@ -1140,7 +1163,7 @@ uint8_t MoonBotRemoteController::wheelReadRpm(void) {
       right_rpm = TankBase.readRpm(kRightMotor);
       break;
     default:
-      return MU_ERROR_REG_VALUE;
+      return MU_SLAVE_UNKNOW_REG_VALUE;
   }
 
   resetParameterIndex();
@@ -1157,7 +1180,7 @@ uint8_t MoonBotRemoteController::wheelForward(void) {
       TankBase.forward(distance, speed);
       break;
     default:
-      return MU_ERROR_REG_VALUE;
+      return MU_SLAVE_UNKNOW_REG_VALUE;
   }
   while(TankBase.read(kLeftMotor)&&TankBase.read(kRightMotor));
   delay(100);
@@ -1173,7 +1196,7 @@ uint8_t MoonBotRemoteController::wheelBackward(void) {
       TankBase.backward(distance, speed);
       break;
     default:
-      return MU_ERROR_REG_VALUE;
+      return MU_SLAVE_UNKNOW_REG_VALUE;
   }
   while(TankBase.read(kLeftMotor)&&TankBase.read(kRightMotor));
   delay(100);
@@ -1189,7 +1212,7 @@ uint8_t MoonBotRemoteController::wheelTurnLeft(void) {
       TankBase.turnLeft(angle, speed);
       break;
     default:
-      return MU_ERROR_REG_VALUE;
+      return MU_SLAVE_UNKNOW_REG_VALUE;
   }
   while(TankBase.read(kLeftMotor) || TankBase.read(kRightMotor));
   delay(100);
@@ -1205,7 +1228,7 @@ uint8_t MoonBotRemoteController::wheelTurnRight(void) {
       TankBase.turnRight(angle, speed);
       break;
     default:
-      return MU_ERROR_REG_VALUE;
+      return MU_SLAVE_UNKNOW_REG_VALUE;
   }
   while(TankBase.read(kLeftMotor) || TankBase.read(kRightMotor));
   delay(100);
@@ -1218,7 +1241,7 @@ uint8_t MoonBotRemoteController::wheelStop(void) {
       TankBase.stop();
       break;
     default:
-      return MU_ERROR_REG_VALUE;
+      return MU_SLAVE_UNKNOW_REG_VALUE;
   }
   resetParameterIndex();
   return MU_OK;
@@ -1231,7 +1254,7 @@ uint8_t MoonBotRemoteController::wheelSetDistanceStep(void) {
       TankBase.distanceCorrection(percent);
       break;
     default:
-      return MU_ERROR_REG_VALUE;
+      return MU_SLAVE_UNKNOW_REG_VALUE;
   }
 
   resetParameterIndex();
@@ -1245,7 +1268,7 @@ uint8_t MoonBotRemoteController::wheelSetAngleStep(void) {
       TankBase.wheelSpacingSet(percent);
       break;
     default:
-      return MU_ERROR_REG_VALUE;
+      return MU_SLAVE_UNKNOW_REG_VALUE;
   }
 
   resetParameterIndex();
@@ -1266,7 +1289,7 @@ uint8_t MoonBotRemoteController::buzzerWrite(void) {
       break;
     default:
       EPRINTF("Not available id:%d\n", id_);
-      return MU_ERROR_REG_VALUE;
+      return MU_SLAVE_UNKNOW_REG_VALUE;
   }
   resetParameterIndex();
   return MU_OK;
@@ -1395,8 +1418,9 @@ uint8_t MoonBotRemoteController::buzzerPlayMusic(uint32_t music_id) {
       break;
     default:
       EPRINTF("Not available music_id:%lu\n", music_id);
-      return MU_ERROR_REG_VALUE;
+      return MU_SLAVE_UNKNOW_REG_VALUE;
   }
+  clearBuffer();
   return MU_OK;
 }
 uint8_t MoonBotRemoteController::buzzerPlay(void) {
@@ -1425,7 +1449,7 @@ uint8_t MoonBotRemoteController::speakerPlay(void) {
     default:
       EPRINTF("Not available id:%d\n", id_);
       resetParameterIndex();
-      return MU_ERROR_REG_VALUE;
+      return MU_SLAVE_UNKNOW_REG_VALUE;
   }
   resetParameterIndex();
   return MU_OK;
@@ -1449,13 +1473,13 @@ uint8_t MoonBotRemoteController::speakerSet(void) {
           speaker.playPrevious();
           break;
         default:
-          return MU_ERROR_REG_VALUE;
+          return MU_SLAVE_UNKNOW_REG_VALUE;
       }
       speaker.stop();
       break;
     default:
       EPRINTF("Not available id:%d\n", id_);
-      return MU_ERROR_REG_VALUE;
+      return MU_SLAVE_UNKNOW_REG_VALUE;
   }
   resetParameterIndex();
   return MU_OK;
@@ -1469,7 +1493,7 @@ uint8_t MoonBotRemoteController::speakerSetVolume(void) {
       break;
     default:
       EPRINTF("Not available id:%d\n", id_);
-      return MU_ERROR_REG_VALUE;
+      return MU_SLAVE_UNKNOW_REG_VALUE;
   }
   resetParameterIndex();
   return MU_OK;
@@ -1484,7 +1508,7 @@ uint8_t MoonBotRemoteController::speakerSetPlayMode(void) {
     default:
       EPRINTF("Not available id:%d\n", id_);
       resetParameterIndex();
-      return MU_ERROR_REG_VALUE;
+      return MU_SLAVE_UNKNOW_REG_VALUE;
   }
   resetParameterIndex();
   return MU_OK;
@@ -1556,7 +1580,7 @@ uint8_t MoonBotRemoteController::imuCalibrate(void) {
     default:
       EPRINTF("Not available id:%d\n", id_);
       resetParameterIndex();
-      return MU_ERROR_REG_VALUE;
+      return MU_SLAVE_UNKNOW_REG_VALUE;
   }
   resetParameterIndex();
   return MU_OK;
@@ -1572,7 +1596,7 @@ uint8_t MoonBotRemoteController::imuReadCompass(void) {
     default:
       EPRINTF("Not available id:%d\n", id_);
       resetParameterIndex();
-      return MU_ERROR_REG_VALUE;
+      return MU_SLAVE_UNKNOW_REG_VALUE;
   }
   IPRINTF("Mag Angle = %u\n", angle);
   resetParameterIndex();
@@ -1596,7 +1620,7 @@ uint8_t MoonBotRemoteController::imuReadAcceleration(void) {
     default:
       EPRINTF("Not available id:%d\n", id_);
       resetParameterIndex();
-      return MU_ERROR_REG_VALUE;
+      return MU_SLAVE_UNKNOW_REG_VALUE;
   }
   resetParameterIndex();
   setParameter<int16_t>(retval);
@@ -1612,7 +1636,7 @@ uint8_t MoonBotRemoteController::imuTemperature(void) {
     default:
       EPRINTF("Not available id:%d\n", id_);
       resetParameterIndex();
-      return MU_ERROR_REG_VALUE;
+      return MU_SLAVE_UNKNOW_REG_VALUE;
   }
   resetParameterIndex();
   setParameter<int16_t>(temperature);
@@ -1689,7 +1713,7 @@ uint8_t MoonBotRemoteController::imuMotion(void) {
     default:
       EPRINTF("Not available motion type: %d\n", motion);
       resetParameterIndex();
-      return MU_ERROR_REG_VALUE;
+      return MU_SLAVE_UNKNOW_REG_VALUE;
   }
 
   resetParameterIndex();
@@ -1708,7 +1732,7 @@ uint8_t MoonBotRemoteController::imuRatationRead(void) {
     default:
       EPRINTF("Not available type: %d\n", type);
       resetParameterIndex();
-      return MU_ERROR_REG_VALUE;
+      return MU_SLAVE_UNKNOW_REG_VALUE;
   }
 
   resetParameterIndex();
@@ -1724,7 +1748,7 @@ uint8_t MoonBotRemoteController::appButtonClick(void) {
 //    default:
 //      break;
 //  }
-  return MU_ERROR_REG_VALUE;
+  return MU_SLAVE_UNKNOW_REG_VALUE;
 }
 // test command:    FF0C6080030100FF00604EED      // angle: 255, speed: 96
 uint8_t MoonBotRemoteController::appButtonDrag(void) {
@@ -1752,6 +1776,7 @@ uint8_t MoonBotRemoteController::appButtonDrag(void) {
         left_speed = map(angle, 270, 360, -255, 255)*speed/100;
       }
       TankBase.write(left_speed, right_speed);
+      enableTankBaseStopEvent();
       IPRINTF("appButtonDrag: left_speed = %d, right_speed = %d\n",
              left_speed, right_speed);
       break;
@@ -1759,7 +1784,7 @@ uint8_t MoonBotRemoteController::appButtonDrag(void) {
     default:
       EPRINTF("Not available id:%d\n", id_);
       resetParameterIndex();
-      return MU_ERROR_REG_VALUE;
+      return MU_SLAVE_UNKNOW_REG_VALUE;
   }
   resetParameterIndex();
   return MU_OK;
